@@ -69,13 +69,33 @@ contract Marketplace is ReentrancyGuard {
 
     //purchaseItem is payable so that the buyer could send the ether, this ether will be sent to the seller of that item and a small part of it goes to fee account i.e. to the deployer of marketplace contract
     function purchaseItem(uint _itemId) external payable nonReentrant { 
-        uint _totalPrice = get
+        uint _totalPrice = getTotalPrice(_itemId);
+        Item storage item = items[_itemId];
+        require(_itemId>0 && _itemId <= itemCount, "item doesn't exist");
+        require(msg.value>= _totalPrice, "not enough ether to cover item price and market fee");
+        require(!item.sold, "item already sold");
+        //pay seller and feeAccount
+        item.seller.transfer(item.price);
+        feeAccount.transfer(_totalPrice - item.price);
+        //update item to sold
+        item.sold = true;
+        //transfer nft to buyer
+        item.nft.transferFrom(address(this), msg.sender, item.tokenId);
 
+        //emit bought event
+        emit Bought(
+            _itemId,
+            address(item.nft),
+            item.tokenId,
+            item.price,
+            item.seller,
+            msg.sender
+        );
     }
 
     // getTotalPrice gives us the total price of an item including the price of item + the fee Percent included in marketPlace. Also view bcoz it can't modify any state variable
     function getTotalPrice(uint _itemId) view public returns(uint) {
-        return(items[_itemId].price*(100 + feePercent/100));
+        return( (items[_itemId].price*(100 + feePercent))/100);
     }
 
 
